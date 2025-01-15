@@ -26,43 +26,60 @@ func main() {
 		log.Fatalf("Number of sets scan error: %s", err.Error())
 	}
 
-	log.Printf("Number of sets: %d", setsNumber)
-
 	for i := 0; i < setsNumber; i++ {
-		var count int
+		var count string
+		//var srcArray string
+		//var sortedArray string
 
 		_, err = fmt.Fscan(in, &count)
 		if err != nil {
-			log.Printf("Count scan error: %s\n", err.Error())
+			log.Printf("Data scan error: %s", err.Error())
 
 			fmt.Fprintln(out, "no")
 
 			continue
 		}
 
-		log.Printf("Count of numbers: %d", count)
-
-		var arrayStr string
-
-		_, err = fmt.Fscan(in, &arrayStr)
+		str, err := in.ReadString('\n')
 		if err != nil {
-			log.Printf("Array scan error: %s\n", err.Error())
-
 			fmt.Fprintln(out, "no")
-
 			continue
 		}
 
-		var sortedArrayStr string
+		log.Println(str)
+		//log.Println(sortedArray)
 
-		_, err = fmt.Fscan(in, &sortedArrayStr)
-		if err != nil {
-			log.Printf("Sorted array scan error: %s\n", err.Error())
+		//sortedArray, err := scanString(in)
+		//if err != nil {
+		//	fmt.Fprintln(out, "no")
+		//	continue
+		//}
+		//
+		//log.Printf("Sorted array: %s", sortedArray)
 
-			fmt.Fprintln(out, "no")
-
-			continue
-		}
+		//if !checkLengths(sourceArray, sortedArray) {
+		//	fmt.Fprintln(out, "no")
+		//	continue
+		//}
 
 	}
+}
+
+func scanString(in *bufio.Reader) ([]any, error) {
+	//var str []string
+
+	str := make([]any, 0)
+
+	_, err := fmt.Fscan(in, str...)
+	if err != nil {
+		log.Printf("String scan error: %s\n", err.Error())
+
+		return nil, err
+	}
+
+	return str, nil
+}
+
+func checkLengths(sourceArray, sortedArray string) bool {
+	return len(sourceArray) == len(sortedArray)
 }
