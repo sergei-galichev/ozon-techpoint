@@ -57,14 +57,22 @@ func getMaxSalaryWithoutOneDigit(salary string) string {
 		return "0"
 	}
 
-	for i := 0; i < len(salary); i++ {
-	}
-
 	maxSalary := ""
+	isRemoved := false
 
 	for i := 0; i < len(salary); i++ {
-		//tmpSalary := salary[:i] + salary[i+1:]
+		if i == len(salary)-1 && !isRemoved {
+			maxSalary = salary[:i] + salary[i+1:]
 
+			break
+		}
+
+		if salary[i] < salary[i+1] {
+			maxSalary = salary[:i] + salary[i+1:]
+			isRemoved = true
+
+			break
+		}
 	}
 
 	return maxSalary
