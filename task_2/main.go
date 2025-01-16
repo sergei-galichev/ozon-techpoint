@@ -3,8 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -103,15 +105,37 @@ func scanArrayToValidate(in *bufio.Reader, count int) ([]int, error) {
 
 	validateArray := make([]int, count)
 
-	for i := 0; i < count; i++ {
-		_, err := fmt.Fscan(in, &validateArray[i])
-		if err != nil {
-			// TODO: remove it after complete
-			log.Printf("Validate array scan error: %s", err.Error())
-
-			return nil, err
+	for {
+		str, e := in.ReadString('\n')
+		if e != nil {
+			if e == io.EOF {
+				break
+			} else {
+				fmt.Println(e)
+				return nil, e
+			}
 		}
+
+		value := strings.TrimSpace(str)
+
+		if value == "" {
+			log.Printf("entered value is empty")
+			continue
+		}
+
+		log.Printf("validate array: %s", value)
+		//log.Printf("validate array: %d", len(strings.TrimSpace(str)))
 	}
+
+	//for i := 0; i < count; i++ {
+	//	_, err := fmt.Fscan(in, &validateArray[i])
+	//	if err != nil {
+	//TODO: remove it after complete
+	//log.Printf("Validate array scan error: %s", err.Error())
+	//
+	//return nil, err
+	//}
+	//}
 
 	return validateArray, nil
 }
