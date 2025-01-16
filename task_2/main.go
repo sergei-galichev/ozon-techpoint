@@ -21,65 +21,101 @@ func main() {
 		}
 	}()
 
+	// TODO: remove it after complete
+	fmt.Println("Enter count of sets:")
+
 	_, err := fmt.Fscan(in, &setsNumber)
 	if err != nil {
-		log.Fatalf("Number of sets scan error: %s", err.Error())
+		log.Fatalf("Count of sets scan error: %s", err.Error())
 	}
 
 	for i := 0; i < setsNumber; i++ {
-		var count string
-		//var srcArray string
-		//var sortedArray string
-
-		_, err = fmt.Fscan(in, &count)
-		if err != nil {
-			log.Printf("Data scan error: %s", err.Error())
-
+		result := scanSetAndValidate(in)
+		if !result {
 			fmt.Fprintln(out, "no")
-
-			continue
+		} else {
+			fmt.Fprintln(out, "yes")
 		}
-
-		str, err := in.ReadString('\n')
-		if err != nil {
-			fmt.Fprintln(out, "no")
-			continue
-		}
-
-		log.Println(str)
-		//log.Println(sortedArray)
-
-		//sortedArray, err := scanString(in)
-		//if err != nil {
-		//	fmt.Fprintln(out, "no")
-		//	continue
-		//}
-		//
-		//log.Printf("Sorted array: %s", sortedArray)
-
-		//if !checkLengths(sourceArray, sortedArray) {
-		//	fmt.Fprintln(out, "no")
-		//	continue
-		//}
-
 	}
 }
 
-func scanString(in *bufio.Reader) ([]any, error) {
-	//var str []string
-
-	str := make([]any, 0)
-
-	_, err := fmt.Fscan(in, str...)
+func scanSetAndValidate(in *bufio.Reader) bool {
+	numberCount, err := scanNumberCount(in)
 	if err != nil {
-		log.Printf("String scan error: %s\n", err.Error())
-
-		return nil, err
+		return false
 	}
 
-	return str, nil
+	srcArray, err := scanSourceArrayOfIntegers(in, numberCount)
+	if err != nil {
+		return false
+	}
+
+	validateArray, err := scanArrayToValidate(in, numberCount)
+	if err != nil {
+		return false
+	}
+
+	if !checkLengths(srcArray, validateArray) {
+		return false
+	}
+
+	return true
 }
 
-func checkLengths(sourceArray, sortedArray string) bool {
-	return len(sourceArray) == len(sortedArray)
+func scanNumberCount(in *bufio.Reader) (int, error) {
+	var numberCount int
+	// TODO: remove it after complete
+	fmt.Println("Enter count of numbers:")
+
+	_, err := fmt.Fscan(in, &numberCount)
+	if err != nil {
+		// TODO: remove it after complete
+		log.Printf("Count of numbers scan error: %s", err.Error())
+
+		return -1, err
+	}
+
+	return numberCount, nil
+}
+
+func scanSourceArrayOfIntegers(in *bufio.Reader, count int) ([]int, error) {
+	srcArray := make([]int, count)
+
+	// TODO: remove it after complete
+	fmt.Println("Enter source array with space delimiter:")
+
+	for i := 0; i < count; i++ {
+		_, err := fmt.Fscan(in, &srcArray[i])
+		if err != nil {
+			// TODO: remove it after complete
+			log.Printf("Source array scan error: %s", err.Error())
+
+			return nil, err
+		}
+	}
+
+	return srcArray, nil
+}
+
+func scanArrayToValidate(in *bufio.Reader, count int) ([]int, error) {
+	// TODO: remove it after complete
+	fmt.Println("Enter array to validate with space delimiter:")
+
+	validateArray := make([]int, count)
+
+	for i := 0; i < count; i++ {
+		_, err := fmt.Fscan(in, &validateArray[i])
+		if err != nil {
+			// TODO: remove it after complete
+			log.Printf("Validate array scan error: %s", err.Error())
+
+			return nil, err
+		}
+	}
+
+	return validateArray, nil
+}
+
+func checkLengths(srcArray, validateArray []int) bool {
+	return len(srcArray) == len(validateArray)
 }
