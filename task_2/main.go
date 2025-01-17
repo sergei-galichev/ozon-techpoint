@@ -2,10 +2,12 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
+	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -22,9 +24,6 @@ func main() {
 			panic(err)
 		}
 	}()
-
-	// TODO: remove it after complete
-	fmt.Println("Enter count of sets:")
 
 	_, err := fmt.Fscan(in, &setsNumber)
 	if err != nil {
@@ -52,12 +51,18 @@ func scanSetAndValidate(in *bufio.Reader) bool {
 		return false
 	}
 
-	validateArray, err := scanArrayToValidate(in, numberCount)
+	validateArray, err := scanArray(in)
 	if err != nil {
 		return false
 	}
 
-	if !checkLengths(srcArray, validateArray) {
+	if len(validateArray) != numberCount {
+		return false
+	}
+
+	slices.Sort(srcArray)
+
+	if slices.Compare(srcArray, validateArray) != 0 {
 		return false
 	}
 
@@ -66,13 +71,9 @@ func scanSetAndValidate(in *bufio.Reader) bool {
 
 func scanNumberCount(in *bufio.Reader) (int, error) {
 	var numberCount int
-	// TODO: remove it after complete
-	fmt.Println("Enter count of numbers:")
 
 	_, err := fmt.Fscan(in, &numberCount)
 	if err != nil {
-		// TODO: remove it after complete
-		log.Printf("Count of numbers scan error: %s", err.Error())
 
 		return -1, err
 	}
@@ -83,15 +84,10 @@ func scanNumberCount(in *bufio.Reader) (int, error) {
 func scanSourceArrayOfIntegers(in *bufio.Reader, count int) ([]int, error) {
 	srcArray := make([]int, count)
 
-	// TODO: remove it after complete
-	fmt.Println("Enter source array with space delimiter:")
-
 	for i := 0; i < count; i++ {
 		_, err := fmt.Fscan(in, &srcArray[i])
 		if err != nil {
-			// TODO: remove it after complete
-			log.Printf("Source array scan error: %s", err.Error())
-
+			log.Printf("scan source error: %s", err.Error())
 			return nil, err
 		}
 	}
@@ -99,47 +95,69 @@ func scanSourceArrayOfIntegers(in *bufio.Reader, count int) ([]int, error) {
 	return srcArray, nil
 }
 
-func scanArrayToValidate(in *bufio.Reader, count int) ([]int, error) {
-	// TODO: remove it after complete
-	fmt.Println("Enter array to validate with space delimiter:")
+func scanArray(in *bufio.Reader) ([]int, error) {
+	var value string
 
-	validateArray := make([]int, count)
+	cycle := 0
 
 	for {
 		str, e := in.ReadString('\n')
 		if e != nil {
-			if e == io.EOF {
-				break
-			} else {
-				fmt.Println(e)
-				return nil, e
-			}
+			fmt.Println(e)
+			return nil, e
 		}
 
-		value := strings.TrimSpace(str)
+		if cycle == 0 {
+			cycle++
 
-		if value == "" {
-			log.Printf("entered value is empty")
 			continue
 		}
 
-		log.Printf("validate array: %s", value)
-		//log.Printf("validate array: %d", len(strings.TrimSpace(str)))
+		value = str
+		break
 	}
 
-	//for i := 0; i < count; i++ {
-	//	_, err := fmt.Fscan(in, &validateArray[i])
-	//	if err != nil {
-	//TODO: remove it after complete
-	//log.Printf("Validate array scan error: %s", err.Error())
-	//
-	//return nil, err
-	//}
-	//}
+	if strings.HasPrefix(value, " ") || strings.HasSuffix(value, " ") {
+		return nil, errors.New("has spaces before or after")
+	}
+
+	strArray := strings.Split(value, " ")
+
+	validateArray, err := convertToIntSlice(strArray)
+	if err != nil {
+		return nil, err
+	}
 
 	return validateArray, nil
 }
 
-func checkLengths(srcArray, validateArray []int) bool {
-	return len(srcArray) == len(validateArray)
+func convertToIntSlice(input []string) ([]int, error) {
+	result := make([]int, len(input))
+
+	for i := 0; i < len(input); i++ {
+		var value string
+
+		if i == len(input)-1 {
+			value = strings.TrimSpace(input[i])
+		} else {
+			value = input[i]
+		}
+
+		if strings.HasPrefix(value, "0") {
+			return nil, errors.New("value has leading zero")
+		}
+
+		if strings.HasPrefix(value, "-0") {
+			return nil, errors.New("value has prefix '-0'")
+		}
+
+		number, err := strconv.Atoi(value)
+		if err != nil {
+			return nil, err
+		}
+
+		result[i] = number
+	}
+
+	return result, nil
 }
