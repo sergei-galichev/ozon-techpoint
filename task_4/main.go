@@ -8,6 +8,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"time"
 )
 
 type Order struct {
@@ -22,7 +23,6 @@ type Car struct {
 	End      int
 	Size     int
 	Capacity int
-	IsFull   bool
 }
 
 func main() {
@@ -30,13 +30,13 @@ func main() {
 	var out *bufio.Writer
 	var setsNumber int
 
-	//file, fErr := os.Open("1")
-	//if fErr != nil {
-	//	log.Fatalf("file open error: %s", fErr.Error())
-	//}
+	file, fErr := os.Open("15")
+	if fErr != nil {
+		log.Fatalf("file open error: %s", fErr.Error())
+	}
 
-	in = bufio.NewReader(os.Stdin)
-	//in = bufio.NewReader(file)
+	//in = bufio.NewReader(os.Stdin)
+	in = bufio.NewReader(file)
 
 	out = bufio.NewWriter(os.Stdout)
 	defer func() {
@@ -69,9 +69,13 @@ func main() {
 
 		cars := readCarData(in, carCount)
 
+		start := time.Now()
+
 		processedOrders := orderProcessing(orders, cars)
 
 		printOrders(out, processedOrders)
+
+		log.Println(time.Since(start))
 	}
 }
 
@@ -79,19 +83,13 @@ func readOrderArrivals(in *bufio.Reader, orderCount int) []Order {
 	orders := make([]Order, orderCount)
 
 	for i := 0; i < orderCount; i++ {
-		var arrivalTime int
-		order := Order{}
-
-		_, err := fmt.Fscan(in, &arrivalTime)
+		_, err := fmt.Fscan(in, &orders[i].ArrivalTime)
 		if err != nil {
 			log.Fatalf("Order arrival scan error: %s", err.Error())
 		}
 
-		order.Number = i
-		order.ArrivalTime = arrivalTime
-		order.CarNumber = -1
-
-		orders[i] = order
+		orders[i].Number = i
+		orders[i].CarNumber = -1
 	}
 
 	return orders
@@ -99,8 +97,6 @@ func readOrderArrivals(in *bufio.Reader, orderCount int) []Order {
 
 func readCarData(in *bufio.Reader, carCount int) []Car {
 	cars := make([]Car, carCount)
-	tmp := make([]int, 3)
-
 	cycle := 0
 
 	for i := 0; i < carCount; {
@@ -111,19 +107,12 @@ func readCarData(in *bufio.Reader, carCount int) []Car {
 			continue
 		}
 
-		car := Car{}
-
-		_, err := fmt.Fscanln(in, &tmp[0], &tmp[1], &tmp[2])
+		_, err := fmt.Fscanln(in, &cars[i].Start, &cars[i].End, &cars[i].Capacity)
 		if err != nil {
 			log.Fatalf("Car data scan error: %s", err.Error())
 		}
 
-		car.Number = i
-		car.Start = tmp[0]
-		car.End = tmp[1]
-		car.Capacity = tmp[2]
-
-		cars[i] = car
+		cars[i].Number = i
 
 		i++
 	}
@@ -137,23 +126,15 @@ func orderProcessing(orders []Order, cars []Car) []Order {
 
 	for i := 0; i < len(orders); i++ {
 		for j := 0; j < len(cars); j++ {
-			if cars[j].IsFull {
+			if cars[j].Size >= cars[j].Capacity {
 				continue
 			}
 
-			if !(orders[i].ArrivalTime >= cars[j].Start && orders[i].ArrivalTime <= cars[j].End) {
-				continue
+			if orders[i].ArrivalTime >= cars[j].Start && orders[i].ArrivalTime <= cars[j].End {
+				orders[i].CarNumber = cars[j].Number + 1
+				cars[j].Size++
+				break
 			}
-
-			orders[i].CarNumber = cars[j].Number + 1
-
-			cars[j].Size++
-
-			if cars[j].Size == cars[j].Capacity {
-				cars[j].IsFull = true
-			}
-
-			break
 		}
 	}
 
@@ -163,16 +144,20 @@ func orderProcessing(orders []Order, cars []Car) []Order {
 }
 
 func printOrders(out *bufio.Writer, orders []Order) {
-	var result string
+
+	result := make([]byte, 0, len(orders)*10)
+
 	for i := 0; i < len(orders); i++ {
-		result += strconv.Itoa(orders[i].CarNumber)
+		result = strconv.AppendInt(result, int64(orders[i].CarNumber), 10)
 
 		if i != len(orders)-1 {
-			result += " "
+			result = append(result, ' ')
 		}
 	}
 
-	fmt.Fprint(out, result)
+	result = append(result, '\n')
+
+	out.Write(result)
 
 }
 
@@ -185,11 +170,9 @@ func sortByNumber(orderA, orderB Order) int {
 }
 
 func sortByStartThenByIndex(carA, carB Car) int {
-	byStart := cmp.Compare(carA.Start, carB.Start)
-
-	if byStart != 0 {
-		return byStart
+	if carA.Start == carB.Start {
+		return cmp.Compare(carA.Number, carB.Number)
 	}
 
-	return cmp.Compare(carA.Number, carB.Number)
+	return cmp.Compare(carA.Start, carB.Start)
 }
