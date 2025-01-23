@@ -154,23 +154,20 @@ func orderProcessing(orders []Order, cars []Car) []Order {
 		carIdxChan2 := make(chan int)
 		done := make(chan struct{})
 
-		go func(cars []Car, middleIdx int) {
+		go func(middleIdx int) {
 			if len(cars) != 0 {
-				//if middleIdx == 0 {
-				//	if isInLoadingTime(cars[middleIdx], orders[i].ArrivalTime) {
-				//		log.Printf("grt1: slice has 1 car. car index: %d\n", middleIdx)
-				//
-				//		carIdxChan1 <- middleIdx
-				//		done <- struct{}{}
-				//		close(carIdxChan1)
-				//
-				//		return
-				//	}
-				//}
+				if middleIdx == 0 {
+					if isInLoadingTime(cars[middleIdx], orders[i].ArrivalTime) {
+						carIdxChan1 <- middleIdx
+						done <- struct{}{}
+						close(carIdxChan1)
+
+						return
+					}
+				}
 
 				for j := 0; j < middleIdx; j++ {
 					if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
-
 						carIdxChan1 <- j
 						done <- struct{}{}
 						close(carIdxChan1)
@@ -182,48 +179,50 @@ func orderProcessing(orders []Order, cars []Car) []Order {
 
 			carIdxChan1 <- -1
 			close(carIdxChan1)
-		}(cars, middle)
+		}(middle)
 
 		go func(middleIdx int) {
 			if len(cars) != 0 {
 				j := middleIdx
 
-				select {
-				case <-done:
-					carIdxChan2 <- -1
-					close(done)
-					close(carIdxChan2)
+				for {
+					select {
+					case <-done:
+						carIdxChan2 <- -1
+						close(done)
+						close(carIdxChan2)
 
-					return
+						return
 
-				default:
-					if j == 0 {
+					default:
+						if j == 0 || j == len(cars) {
+							//	if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
+							//		carIdxChan2 <- j
+							//		close(carIdxChan2)
+							//
+							//		return
+							//	}
+							carIdxChan2 <- -1
+							close(carIdxChan2)
+
+							return
+						}
+
+						//if len(cars)-j == 0 {
+						//	carIdxChan2 <- -1
+						//	break
+						//}
 						if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
 							carIdxChan2 <- j
 							close(carIdxChan2)
 
 							return
 						}
+
+						j++
 					}
-
-					if j == len(cars) {
-
-						break
-					}
-
-					if len(cars)-j == 0 {
-						carIdxChan2 <- -1
-						break
-					}
-					if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
-						carIdxChan2 <- j
-						close(carIdxChan2)
-
-						return
-					}
-
-					j++
 				}
+
 			}
 
 			carIdxChan2 <- -1
@@ -232,63 +231,29 @@ func orderProcessing(orders []Order, cars []Car) []Order {
 
 		carIdx1 := <-carIdxChan1
 		carIdx2 := <-carIdxChan2
+		//close(done)
+
+		idx := -1
 
 		if carIdx1 == -1 && carIdx2 == -1 {
-			log.Println("car not found")
-
-			orders[i].CarNumber = -1
+			orders[i].CarNumber = idx
 
 			continue
-		}
-
-		if carIdx1 == -1 {
-			log.Printf("from grt#2 -> to car idx #%d", carIdx2)
-
-			orders[i].CarNumber = cars[carIdx2].Number + 1
-			cars[carIdx2].Size++
-
-			if isCarFull(cars[carIdx2]) {
-				cars = append(cars[:carIdx2], cars[carIdx2+1:]...)
-			}
-
-			continue
-		}
-
-		if carIdx2 == -1 {
-			log.Printf("from grt#1 -> to car idx #%d", carIdx1)
-
-			orders[i].CarNumber = cars[carIdx1].Number + 1
-			cars[carIdx1].Size++
-
-			if isCarFull(cars[carIdx1]) {
-				cars = append(cars[:carIdx1], cars[carIdx1+1:]...)
-			}
-
-			continue
-		}
-
-		if carIdx1 < carIdx2 || carIdx1 == carIdx2 {
-			log.Printf("compare car idx: #%d and #%d", carIdx1, carIdx2)
-
-			orders[i].CarNumber = cars[carIdx1].Number + 1
-			cars[carIdx1].Size++
-
-			if isCarFull(cars[carIdx1]) {
-				cars = append(cars[:carIdx1], cars[carIdx1+1:]...)
-			}
-
-			continue
+		} else if carIdx1 == -1 && carIdx2 >= 0 {
+			idx = carIdx2
+		} else if carIdx2 == -1 && carIdx1 >= 0 {
+			idx = carIdx1
+		} else if carIdx1 < carIdx2 || carIdx1 == carIdx2 {
+			idx = carIdx1
 		} else {
-			log.Printf("compare car idx: #%d and #%d", carIdx1, carIdx2)
+			idx = carIdx2
+		}
 
-			orders[i].CarNumber = cars[carIdx2].Number + 1
-			cars[carIdx2].Size++
+		orders[i].CarNumber = cars[idx].Number + 1
+		cars[idx].Size++
 
-			if isCarFull(cars[carIdx2]) {
-				cars = append(cars[:carIdx2], cars[carIdx2+1:]...)
-			}
-
-			continue
+		if isCarFull(cars[idx]) {
+			cars = append(cars[:idx], cars[idx+1:]...)
 		}
 
 		//for j := 0; j < len(cars); j++ {
@@ -335,7 +300,7 @@ func printOrders(out *bufio.Writer, orders []Order) {
 
 	result = append(result, '\n')
 
-	out.Write(result)
+	//out.Write(result)
 
 }
 
