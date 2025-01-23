@@ -8,6 +8,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -148,105 +149,49 @@ func orderProcessing(orders []Order, cars []Car) []Order {
 	//log.Printf("is there exist car with zero capacity: %v", checkCarZeroCapacity(cars))
 
 	for i := 0; i < len(orders); i++ {
+		if len(cars) == 0 {
+			orders[i].CarNumber = -1
+
+			continue
+		}
+
 		middle := len(cars) / 2
-
-		carIdxChan1 := make(chan int)
-		carIdxChan2 := make(chan int)
-		done := make(chan struct{})
-
-		go func(middleIdx int) {
-			if len(cars) != 0 {
-				if middleIdx == 0 {
-					if isInLoadingTime(cars[middleIdx], orders[i].ArrivalTime) {
-						carIdxChan1 <- middleIdx
-						done <- struct{}{}
-						close(carIdxChan1)
-
-						return
-					}
-				}
-
-				for j := 0; j < middleIdx; j++ {
-					if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
-						carIdxChan1 <- j
-						done <- struct{}{}
-						close(carIdxChan1)
-
-						return
-					}
-				}
-			}
-
-			carIdxChan1 <- -1
-			close(carIdxChan1)
-		}(middle)
-
-		go func(middleIdx int) {
-			if len(cars) != 0 {
-				j := middleIdx
-
-				for {
-					select {
-					case <-done:
-						carIdxChan2 <- -1
-						close(done)
-						close(carIdxChan2)
-
-						return
-
-					default:
-						if j == 0 || j == len(cars) {
-							//	if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
-							//		carIdxChan2 <- j
-							//		close(carIdxChan2)
-							//
-							//		return
-							//	}
-							carIdxChan2 <- -1
-							close(carIdxChan2)
-
-							return
-						}
-
-						//if len(cars)-j == 0 {
-						//	carIdxChan2 <- -1
-						//	break
-						//}
-						if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
-							carIdxChan2 <- j
-							close(carIdxChan2)
-
-							return
-						}
-
-						j++
-					}
-				}
-
-			}
-
-			carIdxChan2 <- -1
-			close(carIdxChan2)
-		}(middle)
-
-		carIdx1 := <-carIdxChan1
-		carIdx2 := <-carIdxChan2
-		//close(done)
 
 		idx := -1
 
-		if carIdx1 == -1 && carIdx2 == -1 {
-			orders[i].CarNumber = idx
+		if cars[middle].Start > orders[i].ArrivalTime {
+			for j := 0; j < middle; j++ {
+				if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
+					idx = j
 
+					log.Printf("left: car idx=%d", idx)
+
+					break
+				}
+			}
+		}
+
+		if idx == -1 && isInLoadingTime(cars[middle], orders[i].ArrivalTime) {
+			idx = middle
+
+			log.Printf("middle: car idx=%d", idx)
+		}
+
+		if idx == -1 && len(cars) >= 3 && cars[middle].Start <= orders[i].ArrivalTime {
+			for j := middle + 1; j < len(cars); j++ {
+				if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
+					idx = j
+
+					log.Printf("right: car idx=%d", idx)
+
+					break
+				}
+			}
+		}
+
+		if idx == -1 {
+			orders[i].CarNumber = -1
 			continue
-		} else if carIdx1 == -1 && carIdx2 >= 0 {
-			idx = carIdx2
-		} else if carIdx2 == -1 && carIdx1 >= 0 {
-			idx = carIdx1
-		} else if carIdx1 < carIdx2 || carIdx1 == carIdx2 {
-			idx = carIdx1
-		} else {
-			idx = carIdx2
 		}
 
 		orders[i].CarNumber = cars[idx].Number + 1
@@ -276,29 +221,29 @@ func orderProcessing(orders []Order, cars []Car) []Order {
 
 func printOrders(out *bufio.Writer, orders []Order) {
 
-	//result := strings.Builder{}
-	//
-	//for i := 0; i < len(orders); i++ {
-	//	result.WriteString(strconv.Itoa(orders[i].CarNumber))
-	//
-	//	if i != len(orders)-1 {
-	//		result.WriteString(" ")
-	//	}
-	//}
-
-	//fmt.Fprintln(out, result.String())
-
-	result := make([]byte, 0, len(orders)*10)
+	result := strings.Builder{}
 
 	for i := 0; i < len(orders); i++ {
-		result = strconv.AppendInt(result, int64(orders[i].CarNumber), 10)
+		result.WriteString(strconv.Itoa(orders[i].CarNumber))
 
 		if i != len(orders)-1 {
-			result = append(result, ' ')
+			result.WriteString(" ")
 		}
 	}
 
-	result = append(result, '\n')
+	fmt.Fprintln(out, result.String())
+
+	//result := make([]byte, 0, len(orders)*10)
+	//
+	//for i := 0; i < len(orders); i++ {
+	//	result = strconv.AppendInt(result, int64(orders[i].CarNumber), 10)
+	//
+	//	if i != len(orders)-1 {
+	//		result = append(result, ' ')
+	//	}
+	//}
+	//
+	//result = append(result, '\n')
 
 	//out.Write(result)
 
@@ -363,7 +308,7 @@ func isCarFull(car Car) bool {
 }
 
 func isInLoadingTime(car Car, start int) bool {
-	return car.Start <= start && car.End >= start
+	return car.Start <= start && car.End > start
 }
 
 func checkCarZeroCapacity(cars []Car) bool {
