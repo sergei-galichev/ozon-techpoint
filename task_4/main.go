@@ -31,7 +31,7 @@ func main() {
 	var out *bufio.Writer
 	var setsNumber int
 
-	file, fErr := os.Open("3")
+	file, fErr := os.Open("15")
 	if fErr != nil {
 		log.Fatalf("file open error: %s", fErr.Error())
 	}
@@ -157,14 +157,29 @@ func orderProcessing(orders []Order, cars []Car) []Order {
 
 		middle := len(cars) / 2
 
+		if middle == 0 {
+			if isInLoadingTime(cars[middle], orders[i].ArrivalTime) {
+				orders[i].CarNumber = cars[middle].Number + 1
+				cars[middle].Size++
+
+				if isCarFull(cars[middle]) {
+					cars = append(cars[:middle], cars[middle+1:]...)
+				}
+			}
+
+			orders[i].CarNumber = -1
+
+			continue
+		}
+
 		idx := -1
 
-		if cars[middle].Start > orders[i].ArrivalTime {
+		if middle != 0 {
 			for j := 0; j < middle; j++ {
 				if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
 					idx = j
 
-					log.Printf("left: car idx=%d", idx)
+					//log.Printf("left: car idx=%d", idx)
 
 					break
 				}
@@ -174,15 +189,15 @@ func orderProcessing(orders []Order, cars []Car) []Order {
 		if idx == -1 && isInLoadingTime(cars[middle], orders[i].ArrivalTime) {
 			idx = middle
 
-			log.Printf("middle: car idx=%d", idx)
+			//log.Printf("middle: car idx=%d", idx)
 		}
 
-		if idx == -1 && len(cars) >= 3 && cars[middle].Start <= orders[i].ArrivalTime {
+		if idx == -1 && len(cars) >= 3 {
 			for j := middle + 1; j < len(cars); j++ {
 				if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
 					idx = j
 
-					log.Printf("right: car idx=%d", idx)
+					//log.Printf("right: car idx=%d", idx)
 
 					break
 				}
@@ -231,7 +246,7 @@ func printOrders(out *bufio.Writer, orders []Order) {
 		}
 	}
 
-	fmt.Fprintln(out, result.String())
+	//fmt.Fprintln(out, result.String())
 
 	//result := make([]byte, 0, len(orders)*10)
 	//
