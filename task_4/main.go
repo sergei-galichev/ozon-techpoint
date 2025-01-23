@@ -142,45 +142,166 @@ func readCarData(in *bufio.Reader, carCount int) []Car {
 }
 
 func orderProcessing(orders []Order, cars []Car) []Order {
-	start := time.Now()
-
 	slices.SortFunc(orders, sortByArrival)
-	log.Printf("orders: %+v", orders)
+	slices.SortFunc(cars, sortByStartThenByNumber)
 
-	log.Printf("sort orders time execution: %s", time.Since(start))
-
-	slices.SortFunc(cars, sortByStartThenByIndex)
-
-	log.Printf("sort cars time execution: %s", time.Since(start))
+	//log.Printf("is there exist car with zero capacity: %v", checkCarZeroCapacity(cars))
 
 	for i := 0; i < len(orders); i++ {
-		//log.Printf("----------------begin. min start: %d----------------", orders[i].ArrivalTime)
+		middle := len(cars) / 2
 
-		minStart := orders[i].ArrivalTime
+		carIdxChan1 := make(chan int)
+		carIdxChan2 := make(chan int)
+		done := make(chan struct{})
 
-		idxMiddle := len(cars) / 2
+		go func(cars []Car, middleIdx int) {
+			if len(cars) != 0 {
+				//if middleIdx == 0 {
+				//	if isInLoadingTime(cars[middleIdx], orders[i].ArrivalTime) {
+				//		log.Printf("grt1: slice has 1 car. car index: %d\n", middleIdx)
+				//
+				//		carIdxChan1 <- middleIdx
+				//		done <- struct{}{}
+				//		close(carIdxChan1)
+				//
+				//		return
+				//	}
+				//}
 
-		if idxMiddle-1 > 0 && cars[idxMiddle-1].Start <= minStart {
+				for j := 0; j < middleIdx; j++ {
+					if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
 
+						carIdxChan1 <- j
+						done <- struct{}{}
+						close(carIdxChan1)
+
+						return
+					}
+				}
+			}
+
+			carIdxChan1 <- -1
+			close(carIdxChan1)
+		}(cars, middle)
+
+		go func(middleIdx int) {
+			if len(cars) != 0 {
+				j := middleIdx
+
+				select {
+				case <-done:
+					carIdxChan2 <- -1
+					close(done)
+					close(carIdxChan2)
+
+					return
+
+				default:
+					if j == 0 {
+						if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
+							carIdxChan2 <- j
+							close(carIdxChan2)
+
+							return
+						}
+					}
+
+					if j == len(cars) {
+
+						break
+					}
+
+					if len(cars)-j == 0 {
+						carIdxChan2 <- -1
+						break
+					}
+					if isInLoadingTime(cars[j], orders[i].ArrivalTime) {
+						carIdxChan2 <- j
+						close(carIdxChan2)
+
+						return
+					}
+
+					j++
+				}
+			}
+
+			carIdxChan2 <- -1
+			close(carIdxChan2)
+		}(middle)
+
+		carIdx1 := <-carIdxChan1
+		carIdx2 := <-carIdxChan2
+
+		if carIdx1 == -1 && carIdx2 == -1 {
+			log.Println("car not found")
+
+			orders[i].CarNumber = -1
+
+			continue
 		}
 
-		//idx := findMinAvailableCarIdx(cars, -1, orders[i].ArrivalTime)
+		if carIdx1 == -1 {
+			log.Printf("from grt#2 -> to car idx #%d", carIdx2)
 
-		//log.Printf("----------------end. min start: %d----------------", orders[i].ArrivalTime)
+			orders[i].CarNumber = cars[carIdx2].Number + 1
+			cars[carIdx2].Size++
 
-		//if idx == -1 {
-		//	log.Println("not found")
-		//	continue
+			if isCarFull(cars[carIdx2]) {
+				cars = append(cars[:carIdx2], cars[carIdx2+1:]...)
+			}
+
+			continue
+		}
+
+		if carIdx2 == -1 {
+			log.Printf("from grt#1 -> to car idx #%d", carIdx1)
+
+			orders[i].CarNumber = cars[carIdx1].Number + 1
+			cars[carIdx1].Size++
+
+			if isCarFull(cars[carIdx1]) {
+				cars = append(cars[:carIdx1], cars[carIdx1+1:]...)
+			}
+
+			continue
+		}
+
+		if carIdx1 < carIdx2 || carIdx1 == carIdx2 {
+			log.Printf("compare car idx: #%d and #%d", carIdx1, carIdx2)
+
+			orders[i].CarNumber = cars[carIdx1].Number + 1
+			cars[carIdx1].Size++
+
+			if isCarFull(cars[carIdx1]) {
+				cars = append(cars[:carIdx1], cars[carIdx1+1:]...)
+			}
+
+			continue
+		} else {
+			log.Printf("compare car idx: #%d and #%d", carIdx1, carIdx2)
+
+			orders[i].CarNumber = cars[carIdx2].Number + 1
+			cars[carIdx2].Size++
+
+			if isCarFull(cars[carIdx2]) {
+				cars = append(cars[:carIdx2], cars[carIdx2+1:]...)
+			}
+
+			continue
+		}
+
+		//for j := 0; j < len(cars); j++ {
+		//	if orders[i].ArrivalTime >= cars[j].Start && orders[i].ArrivalTime <= cars[j].End {
+		//		orders[i].CarNumber = cars[j].Number + 1
+		//		cars[j].Size++
+		//
+		//		if isCarFull(cars[j]) {
+		//			cars = append(cars[:j], cars[j+1:]...)
+		//		}
+		//		break
+		//	}
 		//}
-
-		//log.Printf("found idx: %d", idx)
-
-		orders[i].CarNumber = cars[idx].Number + 1
-		cars[idx].Size++
-
-		if isCarFull(cars[idx]) {
-			cars = append(cars[:idx], cars[idx+1:]...)
-		}
 	}
 
 	slices.SortFunc(orders, sortByNumber)
@@ -226,7 +347,7 @@ func sortByNumber(orderA, orderB Order) int {
 	return cmp.Compare(orderA.Number, orderB.Number)
 }
 
-func sortByStartThenByIndex(carA, carB Car) int {
+func sortByStartThenByNumber(carA, carB Car) int {
 	if carA.Start == carB.Start {
 		return cmp.Compare(carA.Number, carB.Number)
 	}
@@ -234,36 +355,42 @@ func sortByStartThenByIndex(carA, carB Car) int {
 	return cmp.Compare(carA.Start, carB.Start)
 }
 
-func findMinAvailableCarIdx(cars []Car, idx, minStart int) Car {
+func findMinAvailableCarNumber(cars []Car, prevIdx, minStart int) int {
 	if len(cars) == 0 {
-		return
+		return -1
 	}
 
 	idxMiddle := len(cars) / 2
 
 	if idxMiddle == 0 {
 		if isInLoadingTime(cars[idxMiddle], minStart) {
-			return idxMiddle
+			cars[idxMiddle].Size++
+
+			return cars[idxMiddle].Number
 		}
 
-		return idx
+		return cars[prevIdx].Number
 	}
 
-	tmpIdx := idx
+	tmpIdx := prevIdx
 
-	if isInLoadingTime(cars[idxMiddle], minStart) {
+	if isInLoadingTime(cars[idxMiddle], minStart) && prevIdx != -1 && idxMiddle <= prevIdx {
 		tmpIdx = idxMiddle
 	}
 
 	if idxMiddle-1 > 0 && cars[idxMiddle-1].Start <= minStart {
-		tmpIdx = findMinAvailableCarIdx(cars[:idxMiddle], tmpIdx, minStart)
+		tmpIdx = findMinAvailableCarNumber(cars[:idxMiddle], tmpIdx, minStart)
 	}
 
 	if idxMiddle+1 <= len(cars)-1 && cars[idxMiddle+1].Start <= minStart {
-		tmpIdx = findMinAvailableCarIdx(cars[idxMiddle+1:], tmpIdx, minStart)
+		tmpIdx = findMinAvailableCarNumber(cars[idxMiddle+1:], tmpIdx, minStart)
 	}
 
-	return tmpIdx
+	if tmpIdx == -1 {
+		return -1
+	}
+
+	return cars[tmpIdx].Number
 }
 
 func isCarFull(car Car) bool {
@@ -272,4 +399,14 @@ func isCarFull(car Car) bool {
 
 func isInLoadingTime(car Car, start int) bool {
 	return car.Start <= start && car.End >= start
+}
+
+func checkCarZeroCapacity(cars []Car) bool {
+	for i := 0; i < len(cars); i++ {
+		if cars[i].Capacity <= 0 {
+			return true
+		}
+	}
+
+	return false
 }
